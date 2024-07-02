@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
-import java.time.LocalDate;
+import java.math.BigDecimal;
 
 /**
  * DTO for {@link com.armaninvestment.parsparandreporter.entities.WarehouseReceipt}
@@ -16,8 +16,11 @@ import java.time.LocalDate;
 public class WarehouseReceiptListDto implements Serializable {
     private Long id;
     private Long warehouseReceiptNumber;
-    private LocalDate warehouseReceiptDate;
+    private String warehouseReceiptDate;
     private String warehouseReceiptDescription;
+    private String customerName;
+    private String reportDate;
+    private Long invoiceNumber;
     private Long totalQuantity;
-    private Long totalAmount;
+    private BigDecimal totalAmount;
 }

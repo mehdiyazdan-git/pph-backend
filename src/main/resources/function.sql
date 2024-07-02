@@ -651,3 +651,43 @@ $$;
 
 alter function get_all_warehouse_receipts_by_receipt_number_and_year_name(bigint) owner to postgres;
 
+create function get_all_contracts_by_year_name(year_name bigint)
+    returns TABLE
+            (
+                id                   bigint,
+                contract_number      character varying,
+                contract_description character varying,
+                startdate            date,
+                enddate              date,
+                customer_name        character varying,
+                total_amount         numeric,
+                total_quantity       numeric
+            )
+    language plpgsql
+as
+$$
+BEGIN
+    RETURN QUERY
+        SELECT c.id,
+               c.contract_number,
+               c.contract_description,
+               c.start_date                                  AS startdate,
+               c.end_date                                    AS enddate,
+               c2.name                                       AS customer_name,
+               COALESCE(SUM(ci.unit_price * ci.quantity), 0) AS total_amount,
+               COALESCE(SUM(ci.quantity), 0)                 AS total_quantity
+        FROM contracts c
+                 join year y on y.id = c.year_id
+                 join customer c2 on c2.id = c.customer_id
+                 join contract_item ci on c.id = ci.contract_id
+        WHERE y.name = year_name
+        GROUP BY c.id, c.contract_number, c.contract_description, c.start_date, c.end_date, c2.name
+        ORDER BY c.id;
+
+END;
+$$;
+
+alter function get_all_contracts_by_year_name(bigint) owner to postgres;
+
+
+

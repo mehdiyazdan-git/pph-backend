@@ -23,12 +23,14 @@ public class Payment {
     @Column(name = "payment_date")
     private LocalDate date;
     @Column(name = "payment_amount")
-    private Double amount;
-    @ManyToOne(cascade = {CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH, CascadeType.DETACH})
+    private Long amount;
+    @Column(name = "payment_subject")
+    private String subject;
+    @ManyToOne
     @JoinColumn(name = "customer_id", foreignKey = @ForeignKey(name = "fk_payment__customer"))
     private Customer customer;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH})
+    @ManyToOne
     @JoinColumn(name = "year_id")
     private Year year;
 

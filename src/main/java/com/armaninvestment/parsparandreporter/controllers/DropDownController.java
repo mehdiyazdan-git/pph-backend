@@ -4,7 +4,7 @@ import com.armaninvestment.parsparandreporter.dtos.dropdowns.ContractDropDownDto
 import com.armaninvestment.parsparandreporter.dtos.dropdowns.CustomerDropDownDto;
 import com.armaninvestment.parsparandreporter.dtos.dropdowns.ProductDropDownDto;
 import com.armaninvestment.parsparandreporter.dtos.dropdowns.ReceiptDropDownDto;
-import com.armaninvestment.parsparandreporter.entities.Customer;
+import com.armaninvestment.parsparandreporter.entities.InvoiceDropDownDto;
 import com.armaninvestment.parsparandreporter.entities.Year;
 import com.armaninvestment.parsparandreporter.mappers.dropdowns.ContractDropDownMapper;
 import com.armaninvestment.parsparandreporter.mappers.dropdowns.CustomerDropDownMapper;
@@ -33,6 +33,7 @@ public class DropDownController {
     private final ProductRepository productRepository;
     private final WarehouseReceiptRepository wareHouseReceiptRepository;
     private final YearRepository yearRepository;
+    private final InvoiceRepository invoiceRepository;
 
     public DropDownController(
             ContractDropDownMapper contractDropDownMapper,
@@ -42,7 +43,7 @@ public class DropDownController {
             ContractRepository contractRepository,
             CustomerRepository customerRepository,
             ProductRepository productRepository,
-            WarehouseReceiptRepository wareHouseReceiptRepository, YearRepository yearRepository) {
+            WarehouseReceiptRepository wareHouseReceiptRepository, YearRepository yearRepository, InvoiceRepository invoiceRepository) {
         this.contractDropDownMapper = contractDropDownMapper;
         this.customerDropDownMapper = customerDropDownMapper;
         this.productDropDownMapper = productDropDownMapper;
@@ -52,31 +53,38 @@ public class DropDownController {
         this.productRepository = productRepository;
         this.wareHouseReceiptRepository = wareHouseReceiptRepository;
         this.yearRepository = yearRepository;
+        this.invoiceRepository = invoiceRepository;
     }
 
-    @GetMapping("/contracts")
+    @GetMapping("/contracts/{yearName}")
     public ResponseEntity<List<ContractDropDownDto>> getContractDropdown(
+            @PathVariable(value = "yearName", required = false) Long yearName,
             @RequestParam(name = "customerId", required = false) Long customerId) {
         List<ContractDropDownDto> contracts;
+        return ResponseEntity.ok(contractRepository.mapToDtoList(customerId, yearName));
+    }
 
-        if (customerId != null) {
-            contracts = contractRepository.findAllByCustomer(new Customer(customerId))
-                    .stream()
-                    .map(contractDropDownMapper::toDto)
-                    .collect(Collectors.toList());
-        } else {
-            contracts = contractRepository.findAll()
-                    .stream()
-                    .map(contractDropDownMapper::toDto)
-                    .collect(Collectors.toList());
+    @GetMapping("/contracts/search/{customerId}/{yearName}")
+    public ResponseEntity<List<ContractDropDownDto>> searchContractDropdown(
+            @PathVariable(value = "yearName", required = false) Long yearName,
+            @PathVariable(value = "customerId", required = false) Long customerId,
+            @RequestParam("searchQuery") String searchQuery
+    ) {
+        List<Object[]> results = contractRepository.searchContractByDescriptionKeywords(searchQuery, customerId, yearName);
+        List<ContractDropDownDto> list = new ArrayList<>();
+
+        for (Object[] result : results) {
+            list.add(new ContractDropDownDto(
+                    (Long) result[0],
+                    (String) result[1]
+            ));
         }
-
-        return ResponseEntity.ok(contracts);
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/customers")
     public ResponseEntity<List<CustomerDropDownDto>> getCustomerDropdown() {
-        List<CustomerDropDownDto> customers = customerRepository.findAll().stream().map(customerDropDownMapper::toDto).collect(Collectors.toList());
+        List<CustomerDropDownDto> customers = customerRepository.mapToDtoList();
         return ResponseEntity.ok(customers);
     }
 
@@ -92,7 +100,7 @@ public class DropDownController {
         if (optionalYear.isEmpty()) {
             throw new EntityNotFoundException("سال با شناسه " + yearName + " یافت نشد.");
         }
-        List<Object[]> results = wareHouseReceiptRepository.getWareHouseReceipts(optionalYear.get().getId());
+        List<Object[]> results = wareHouseReceiptRepository.getAllWarehouseReceiptsByReceiptNumberAndYearName(optionalYear.get().getId());
         List<ReceiptDropDownDto> list = new ArrayList<>();
 
         for (Object[] result : results) {
@@ -118,6 +126,45 @@ public class DropDownController {
 
         for (Object[] result : results) {
             list.add(new ReceiptDropDownDto(
+                    (Long) result[0],
+                    (String) result[1]
+            ));
+        }
+        return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/invoices/{yearName}")
+    public ResponseEntity<List<InvoiceDropDownDto>> getInvoiceDropdown(@PathVariable("yearName") Long yearName) {
+        Optional<Year> optionalYear = yearRepository.findByYearName(yearName);
+        if (optionalYear.isEmpty()) {
+            throw new EntityNotFoundException("سال با شناسه " + yearName + " یافت نشد.");
+        }
+        List<Object[]> results = invoiceRepository.invoiceDropDownByYearId(optionalYear.get().getId());
+        List<InvoiceDropDownDto> list = new ArrayList<>();
+
+        for (Object[] result : results) {
+            list.add(new InvoiceDropDownDto(
+                    (Long) result[0],
+                    (String) result[1]
+            ));
+        }
+        return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/invoices/search/{yearName}")
+    public ResponseEntity<List<InvoiceDropDownDto>> searchInvoiceDropdown(
+            @PathVariable("yearName") Long yearName,
+            @RequestParam("searchQuery") String searchQuery
+    ) {
+        Optional<Year> optionalYear = yearRepository.findByYearName(yearName);
+        if (optionalYear.isEmpty()) {
+            throw new EntityNotFoundException("سال با شناسه " + yearName + " یافت نشد.");
+        }
+        List<Object[]> results = invoiceRepository.searchInvoiceByDescriptionKeywords(searchQuery, optionalYear.get().getId());
+        List<InvoiceDropDownDto> list = new ArrayList<>();
+
+        for (Object[] result : results) {
+            list.add(new InvoiceDropDownDto(
                     (Long) result[0],
                     (String) result[1]
             ));

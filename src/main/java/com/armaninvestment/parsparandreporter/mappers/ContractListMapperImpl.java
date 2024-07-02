@@ -18,8 +18,7 @@ public class ContractListMapperImpl implements ContractListMapper {
             contractListDto.setId(contract.getId());
             contractListDto.setContractNumber(contract.getContractNumber());
             contractListDto.setContractDescription(contract.getContractDescription());
-            contractListDto.setStartDate(contract.getStartDate());
-            contractListDto.setEndDate(contract.getEndDate());
+
 
             long totalAmount = 0;
             long totalQuantity = 0;
@@ -35,8 +34,6 @@ public class ContractListMapperImpl implements ContractListMapper {
                 }
             }
 
-            contractListDto.setTotalAmount(totalAmount);
-            contractListDto.setTotalQuantity(totalQuantity);
 
 
             long invoiceTotalAmount = 0;
@@ -53,7 +50,7 @@ public class ContractListMapperImpl implements ContractListMapper {
                 }
             }
 
-            contractListDto.setInvoiceTotalAmount(invoiceTotalAmount);
+
             return contractListDto;
         }
     }

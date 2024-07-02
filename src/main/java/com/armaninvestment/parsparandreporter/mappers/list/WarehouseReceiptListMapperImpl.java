@@ -17,10 +17,10 @@ public class WarehouseReceiptListMapperImpl implements WarehouseReceiptListMappe
             WarehouseReceiptListDto warehouseReceiptListDto = new WarehouseReceiptListDto();
             warehouseReceiptListDto.setId(warehouseReceipt.getId());
             warehouseReceiptListDto.setWarehouseReceiptNumber(warehouseReceipt.getWarehouseReceiptNumber());
-            warehouseReceiptListDto.setWarehouseReceiptDate(warehouseReceipt.getWarehouseReceiptDate());
+            warehouseReceiptListDto.setWarehouseReceiptDate(String.valueOf(warehouseReceipt.getWarehouseReceiptDate()));
             warehouseReceiptListDto.setWarehouseReceiptDescription(warehouseReceipt.getWarehouseReceiptDescription());
             warehouseReceiptListDto.setTotalQuantity(this.calculateTotalQuantity(warehouseReceipt));
-            warehouseReceiptListDto.setTotalAmount(this.calculateTotalAmount(warehouseReceipt));
+
             return warehouseReceiptListDto;
         }
     }

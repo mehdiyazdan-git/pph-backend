@@ -40,7 +40,7 @@ public class YearServiceImpl implements YearService {
 
     @Override
     public List<YearDto> getAllYears() {
-        List<Year> years = yearRepository.findAll();
+        List<Year> years = yearRepository.findAllYearsOrderByNameDesc();
         return years.stream()
                 .map(yearMapper::toDto)
                 .collect(Collectors.toList());

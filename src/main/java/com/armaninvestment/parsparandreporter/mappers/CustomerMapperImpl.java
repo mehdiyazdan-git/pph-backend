@@ -1,24 +1,11 @@
 package com.armaninvestment.parsparandreporter.mappers;
 
 import com.armaninvestment.parsparandreporter.dtos.CustomerDto;
-import com.armaninvestment.parsparandreporter.dtos.PaymentDto;
 import com.armaninvestment.parsparandreporter.entities.Customer;
-import com.armaninvestment.parsparandreporter.entities.Payment;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Component
 public class CustomerMapperImpl implements CustomerMapper {
-
-    private final PaymentMapper paymentMapper;
-
-    @Autowired
-    public CustomerMapperImpl(PaymentMapper paymentMapper) {
-        this.paymentMapper = paymentMapper;
-    }
 
     public Customer toEntity(CustomerDto customerDto) {
         if (customerDto == null) {
@@ -32,7 +19,6 @@ public class CustomerMapperImpl implements CustomerMapper {
             customer.setEconomicCode(customerDto.getEconomicCode());
             customer.setNationalCode(customerDto.getNationalCode());
             customer.setBigCustomer(customerDto.getBigCustomer());
-            customer.setPayments(this.paymentDtoListToPaymentList(customerDto.getPayments()));
             this.linkPayments(customer);
             return customer;
         }
@@ -50,7 +36,6 @@ public class CustomerMapperImpl implements CustomerMapper {
             customerDto.setEconomicCode(customer.getEconomicCode());
             customerDto.setNationalCode(customer.getNationalCode());
             customerDto.setBigCustomer(customer.getBigCustomer());
-            customerDto.setPayments(this.paymentListToPaymentDtoList(customer.getPayments()));
             return customerDto;
         }
     }
@@ -83,50 +68,7 @@ public class CustomerMapperImpl implements CustomerMapper {
                 customer.setNationalCode(customerDto.getNationalCode());
             }
             customer.setBigCustomer(customerDto.getBigCustomer());
-
-            List<Payment> list;
-            if (customer.getPayments() != null) {
-                list = this.paymentDtoListToPaymentList(customerDto.getPayments());
-                if (list != null) {
-                    customer.getPayments().clear();
-                    customer.getPayments().addAll(list);
-                }
-            } else {
-                list = this.paymentDtoListToPaymentList(customerDto.getPayments());
-                if (list != null) {
-                    customer.setPayments(list);
-                }
-            }
-
-            this.linkPayments(customer);
             return customer;
-        }
-    }
-
-    protected List<Payment> paymentDtoListToPaymentList(List<PaymentDto> list) {
-        if (list == null) {
-            return null;
-        } else {
-            List<Payment> list1 = new ArrayList<>(list.size());
-
-            for (PaymentDto paymentDto : list) {
-                list1.add(this.paymentMapper.toEntity(paymentDto));
-            }
-
-            return list1;
-        }
-    }
-
-    protected List<PaymentDto> paymentListToPaymentDtoList(List<Payment> list) {
-        if (list == null) {
-            return null;
-        } else {
-            List<PaymentDto> list1 = new ArrayList<>(list.size());
-
-            for (Payment payment : list) {
-                list1.add(this.paymentMapper.toDto(payment));
-            }
-            return list1;
         }
     }
 }

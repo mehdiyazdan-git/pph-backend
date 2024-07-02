@@ -33,23 +33,23 @@ public class WarehouseReceipt {
     @Column(name = "warehouse_receipt_description")
     private String warehouseReceiptDescription;
 
-    @OneToMany(mappedBy = "warehouseReceipt", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH}, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "warehouseReceipt", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH}, orphanRemoval = true)
     private List<WarehouseReceiptItem> warehouseReceiptItems = new ArrayList<>();
 
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH, CascadeType.REFRESH})
+    @ManyToOne
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH})
+    @ManyToOne
     @JoinColumn(name = "year_id")
     private Year year;
 
 
-    @OneToOne(fetch = FetchType.EAGER, mappedBy = "warehouseReceipt")
+    @OneToOne(mappedBy = "warehouseReceipt")
     private ReportItem reportItem;
 
-    @OneToOne(fetch = FetchType.EAGER, mappedBy = "warehouseReceipt")
+    @OneToOne(mappedBy = "warehouseReceipt")
     private InvoiceItem invoiceItem;
 
     public WarehouseReceipt(Long id) {

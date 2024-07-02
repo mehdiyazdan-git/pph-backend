@@ -18,10 +18,12 @@
     {
       "enabled": true,
       "type": "Authorization",
-      "value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTcwMDI5MDI5NSwiZXhwIjoxNzAwMzc2Njk1fQ.LX8ryz7UA83oVJB1tVxl09kEUik5udZz73IXQPwf0ng"
+      "value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTcwNTkzMTYxNywiZXhwIjoxNzA2MDE4MDE3fQ.1I_BPZnxNLhdI1VxaDjXtyGw6XA6GympQ9_ACJT8AWw"
     }
   ],
   "maxDescriptionLength": -1,
+  "pmApiKey": "",
+  "pmCollectionId": "",
   "postScript": "",
   "preScript": "",
   "projectList": [
@@ -39,7 +41,9 @@
     "token": "",
     "type": "github"
   },
+  "syncPmAfterSave": false,
   "urlEncodedKeyValueList": [],
   "urlParamsKeyValueList": [],
-  "urlSuffix": ""
+  "urlSuffix": "",
+  "workspaceId": ""
 }

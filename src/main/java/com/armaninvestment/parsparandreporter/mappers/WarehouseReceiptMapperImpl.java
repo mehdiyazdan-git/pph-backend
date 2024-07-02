@@ -120,6 +120,9 @@ public class WarehouseReceiptMapperImpl implements WarehouseReceiptMapper {
             if (warehouseReceipt.getCustomer() == null) {
                 warehouseReceipt.setCustomer(new Customer());
             }
+            if (warehouseReceiptDto.getId() != null) {
+                warehouseReceipt.setId(warehouseReceiptDto.getId());
+            }
             if (warehouseReceiptDto.getCustomerId() != null) {
                 warehouseReceipt.setCustomer(this.toCustomerEntity(warehouseReceiptDto));
             }

@@ -24,4 +24,16 @@ public class InvoiceItemDto implements Serializable {
     public boolean receiptIdIsEqual(Long otherReceiptId) {
         return Objects.equals(this.getWarehouseReceiptId(), otherReceiptId);
     }
+
+    @Override
+    public String toString() {
+        return "InvoiceItemDto{" +
+                "id=" + id +
+                ", productId=" + productId +
+                ", quantity=" + quantity +
+                ", unitPrice=" + unitPrice +
+                ", invoiceId=" + invoiceId +
+                ", warehouseReceiptId=" + warehouseReceiptId +
+                '}';
+    }
 }

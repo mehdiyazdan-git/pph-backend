@@ -25,7 +25,7 @@ public class Addendum {
     @Column(name = "addendum_number")
     private String addendumNumber;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "contract_id", foreignKey = @ForeignKey(name = "fk_addendum__contract"))
     private Contract contract;
 
@@ -41,7 +41,7 @@ public class Addendum {
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH})
+    @ManyToOne
     @JoinColumn(name = "year_id")
     private Year year;
 

@@ -34,30 +34,34 @@ public class Contract {
     private LocalDate endDate;
 
     @Column(name = "advance_payment")
-    private Long advancePayment;
+    private Double advancePayment;
 
     @Column(name = "performance_bond")
-    private Long performanceBond;
+    private Double performanceBond;
 
     @Column(name = "insurance_deposit")
-    private Long insuranceDeposit;
+    private Double insuranceDeposit;
 
-    @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "contract")
     private List<Addendum> addendums = new ArrayList<>();
 
-    @ManyToOne(cascade = CascadeType.MERGE)
+    @ManyToOne
     @JoinColumn(name = "customer_id", foreignKey = @ForeignKey(name = "fk_contract__customer"))
     private Customer customer;
 
-    @OneToMany(mappedBy = "contract", fetch = FetchType.EAGER, cascade = {CascadeType.MERGE})
+    @OneToMany(mappedBy = "contract")
     private Set<Invoice> invoices = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<ContractItem> contractItems = new LinkedHashSet<>();
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH})
+    @ManyToOne
     @JoinColumn(name = "year_id")
     private Year year;
+
+    public Contract(Long id) {
+        this.id = id;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -73,29 +77,3 @@ public class Contract {
     }
 
 }
-//    // جمع بشکه های تعهد شده در قرارداد و الحاقیه ها
-//    public Long getTotalBarrels() {
-//        int total = 0;
-//        if (addendums != null) {
-//            for (Addendum addendum : addendums) {
-//                total += addendum.getQuantity();
-//            }
-//        }
-//        return total + quantity;
-//    }
-//
-//    //جمع قیمت قرارداد و الحاقیه ها
-//    public Long getTotalAmount() {
-//        long totalAmount = 0L;
-//        if (quantity != null && unitPrice != null) {
-//            totalAmount = quantity * unitPrice;
-//        }
-//        if (addendums != null) {
-//            for (Addendum addendum : addendums) {
-//                if (addendum.getQuantity() != null && addendum.getUnitPrice() != null) {
-//                    totalAmount += addendum.getQuantity() * addendum.getUnitPrice();
-//                }
-//            }
-//        }
-//        return totalAmount;
-//    }

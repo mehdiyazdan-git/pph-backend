@@ -23,12 +23,15 @@ public class Invoice {
     private Long invoiceNumber;
     private LocalDate issuedDate;
     private LocalDate dueDate;
+    private Long advancedPayment;
+    private Long performanceBound;
+    private Long insuranceDeposit;
 
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @ToString.Exclude
     private Set<InvoiceItem> invoiceItems = new LinkedHashSet<>();
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToOne
     @JoinColumn(name = "contract_id", foreignKey = @ForeignKey(name = "fk_invoice__contract"))
     private Contract contract;
 
@@ -40,14 +43,20 @@ public class Invoice {
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToOne
     @JoinColumn(name = "invoice_status_id", foreignKey = @ForeignKey(name = "fk_invoice__invoice_status"))
     private InvoiceStatus invoiceStatus;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH})
+    @ManyToOne
     @JoinColumn(name = "year_id")
     private Year year;
 
+    @OneToMany(mappedBy = "invoice", orphanRemoval = true)
+    private Set<Adjustment> adjustments = new LinkedHashSet<>();
+
+    public Invoice(Long id) {
+        this.id = id;
+    }
 
     public Long getAmount() {
         return invoiceItems.stream()

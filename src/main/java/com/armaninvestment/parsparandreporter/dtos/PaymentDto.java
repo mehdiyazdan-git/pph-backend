@@ -17,5 +17,8 @@ public class PaymentDto implements Serializable {
     private Long id;
     private String description;
     private LocalDate date;
-    private Double amount;
+    private Long amount;
+    private String subject = "PRODUCT";
+    private Long customerId;
+    private Long yearId;
 }

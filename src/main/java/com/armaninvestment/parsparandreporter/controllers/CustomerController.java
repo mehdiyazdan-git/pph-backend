@@ -1,7 +1,9 @@
 package com.armaninvestment.parsparandreporter.controllers;
 
 import com.armaninvestment.parsparandreporter.dtos.*;
+import com.armaninvestment.parsparandreporter.entities.CustomerDtoByQuery;
 import com.armaninvestment.parsparandreporter.exceptions.DatabaseIntegrityViolationException;
+import com.armaninvestment.parsparandreporter.exceptions.RowImportException;
 import com.armaninvestment.parsparandreporter.services.CustomerService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceException;
@@ -22,7 +24,7 @@ import java.util.List;
 
 @CrossOrigin
 @RestController
-@RequestMapping("/api/customers")
+@RequestMapping(path = "/api/customers")
 public class CustomerController {
 
     private final CustomerService customerService;
@@ -32,10 +34,75 @@ public class CustomerController {
         this.customerService = customerService;
     }
 
+    @GetMapping(path = {"/not-invoiced/{customerId}", "/not-invoiced/{customerId}/"})
+    @ResponseBody
+    public List<NotInvoicedReceipt> findNotInvoicedReceiptsByCustomerId(@PathVariable Long customerId) {
+        return customerService.findNotInvoicedReceiptsByCustomerId(customerId);
+    }
+
+    @GetMapping(path = "/invoice-upload-by-customerId/{id}")
+    public ResponseEntity<ByteArrayResource> getInvoicesForCustomer(@PathVariable("id") Long customerId) throws IOException {
+
+        XSSFWorkbook workbook = customerService.generateInvoiceUploadExcel(customerId);
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        workbook.write(outputStream);
+        byte[] bytes = outputStream.toByteArray();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", "invoice-upload.xlsx");
+
+        return new ResponseEntity<>(new ByteArrayResource(bytes), headers, HttpStatus.OK);
+    }
+
+    @GetMapping("/{customerId}/name")
+    public ResponseEntity<String> getCustomerNameById(@PathVariable Long customerId) {
+        try {
+            String customerName = customerService.getCustomerNameById(customerId);
+            if (customerName != null) {
+                return new ResponseEntity<>(customerName, HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>("Customer not found", HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            return new ResponseEntity<>("Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @GetMapping("/{customerId}/{yearName}/not-invoiced-details")
+    public List<NotInvoicedDetailsDto> getNotInvoicedAmountDetailsByCustomerIdAndYearName(
+            @PathVariable Long customerId, @PathVariable Long yearName) {
+        return customerService.getNotInvoicedAmountDetailsByCustomerIdAndYearName(customerId, yearName);
+    }
+
+    @GetMapping("/{customerId}/summary")
+    public ClientSummaryResult getClientSummary(@PathVariable Long customerId) {
+        return customerService.getClientSummaryByCustomerId(customerId);
+    }
+
+    @GetMapping("/{customerId}/{contractNumber}/summary-details")
+    public ResponseEntity<List<ClientSummaryDetailsDTO>> getClientSummaryDetails(
+            @PathVariable Long customerId,
+            @PathVariable String contractNumber) {
+
+        List<ClientSummaryDetailsDTO> clientSummaryDetails = customerService.getClientSummaryDetailsByCustomerId(customerId, contractNumber);
+
+        return ResponseEntity.ok(clientSummaryDetails);
+    }
+
     @GetMapping("/search")
     public ResponseEntity<List<CustomerSelectDto>> searchCustomersForDropdown(@RequestParam("searchQuery") String searchQuery) {
         List<CustomerSelectDto> matchingCustomers = customerService.searchCustomersForDropdown(searchQuery);
         return ResponseEntity.ok(matchingCustomers);
+    }
+
+    @GetMapping("/invoice-summary/{customerId}/{yearName}")
+    public ResponseEntity<List<MonthlyCustomerInvoiceSummaryDTO>> getMonthlySummary(
+            @PathVariable Long customerId,
+            @PathVariable Long yearName) {
+        List<MonthlyCustomerInvoiceSummaryDTO> result = customerService.getCustomerInvoiceMonthlySummary(customerId, yearName);
+        return new ResponseEntity<>(result, HttpStatus.OK);
     }
 
     @GetMapping(path = {"/", ""})
@@ -48,6 +115,11 @@ public class CustomerController {
     public ResponseEntity<List<MonthlySales>> findByPersianYearAndGroupedByMonth(@PathVariable("year") Short year) {
         List<MonthlySales> monthlySalesList = customerService.getMonthlySalesByPersianYear(year);
         return ResponseEntity.ok(monthlySalesList);
+    }
+
+    @GetMapping("/{customerId}/{year}/customer-totals")
+    public ResponseEntity<CustomerTotalsDto> calculateCustomerTotals(@PathVariable("customerId") Long customerId, @PathVariable("year") Long year) {
+        return ResponseEntity.status(HttpStatus.OK).body(customerService.calculateCustomerTotals(customerId, year));
     }
 
     @GetMapping("/{year}/monthly-payments")
@@ -99,12 +171,13 @@ public class CustomerController {
     }
 
     @GetMapping(path = "/{id}")
-    public ResponseEntity<CustomerDto> findById(@PathVariable("id") Long id) {
-        CustomerDto customerDto = customerService.findCustomerById(id);
-        if (customerDto != null) {
-            return ResponseEntity.ok(customerDto);
-        } else {
-            return ResponseEntity.notFound().build();
+    public ResponseEntity<?> findById(@PathVariable("id") Long id) {
+        try {
+            CustomerDtoByQuery customerById = customerService.findCustomerById(id);
+            return ResponseEntity.status(HttpStatus.OK).body(customerById);
+        } catch (EntityNotFoundException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
 
@@ -113,6 +186,10 @@ public class CustomerController {
         try {
             CustomerDto createdCustomerDto = customerService.createCustomer(customerDto);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdCustomerDto);
+        } catch (DatabaseIntegrityViolationException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("خطا در ایجاد: " + e.getMessage());
         } catch (PersistenceException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -141,6 +218,7 @@ public class CustomerController {
         } catch (DatabaseIntegrityViolationException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (RuntimeException e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("خطای سمت سرور...");
         }
     }
@@ -149,7 +227,7 @@ public class CustomerController {
     public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
             customerService.importCustomersFromExcel(file);
-            return ResponseEntity.ok("فایل با موفقیت بارگذاری شد."); // Return a success message
+            return ResponseEntity.status(HttpStatus.CREATED).body("فایل با موفقیت بارگذاری شد.");
         } catch (IOException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -157,18 +235,25 @@ public class CustomerController {
         }
     }
 
-    @GetMapping("/export-excel")
-    public ResponseEntity<ByteArrayResource> exportCustomersToExcel() throws IOException {
-        XSSFWorkbook customerWorkbook = customerService.generateCustomerListExcel();
-
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        customerWorkbook.write(outputStream);
-        byte[] bytes = outputStream.toByteArray();
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        headers.setContentDispositionFormData("attachment", "customers.xlsx");
-
-        return new ResponseEntity<>(new ByteArrayResource(bytes), headers, HttpStatus.OK);
+    @PostMapping("/upload-payments")
+    public ResponseEntity<String> uploadPaymentFile(@RequestParam("file") MultipartFile file) {
+        try {
+            customerService.importCustomerPaymentsFromExcel(file);
+            return ResponseEntity.status(HttpStatus.CREATED).body("فایل با موفقیت بارگذاری شد.");
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("خطا در بارگذاری فایل: " + e.getMessage());
+        } catch (RowImportException e) {
+            e.printStackTrace();
+            if (e.getMessage().equals("Cannot get a STRING value from a NUMERIC cell")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("خطا در بارگذاری فایل: امکان خواندن متن از سلول با فرمت عددی وجود ندارد.");
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("خطا در بارگذاری فایل: " + e.getMessage());
+            }
+        }
     }
+
 }

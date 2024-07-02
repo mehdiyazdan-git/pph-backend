@@ -25,7 +25,7 @@ public class Year {
     }
 
     @ToString.Exclude
-    @OneToMany(mappedBy = "year", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH}, orphanRemoval = true)
+    @OneToMany(mappedBy = "year")
     private Set<WarehouseReceipt> warehouseReceipts = new LinkedHashSet<>();
 
     @ToString.Exclude
@@ -33,19 +33,19 @@ public class Year {
     private Set<Report> reports = new LinkedHashSet<>();
 
     @ToString.Exclude
-    @OneToMany(mappedBy = "year", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH}, orphanRemoval = true)
+    @OneToMany(mappedBy = "year")
     private Set<Payment> payments = new LinkedHashSet<>();
 
     @ToString.Exclude
-    @OneToMany(mappedBy = "year", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH}, orphanRemoval = true)
+    @OneToMany(mappedBy = "year")
     private Set<Invoice> invoices = new LinkedHashSet<>();
 
     @ToString.Exclude
-    @OneToMany(mappedBy = "year", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH}, orphanRemoval = true)
+    @OneToMany(mappedBy = "year")
     private Set<Contract> contracts = new LinkedHashSet<>();
 
     @ToString.Exclude
-    @OneToMany(mappedBy = "year", cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH}, orphanRemoval = true)
+    @OneToMany(mappedBy = "year")
     private Set<Addendum> addendums = new LinkedHashSet<>();
 
     @Override

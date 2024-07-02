@@ -15,6 +15,7 @@
     <description>Demo project for Spring Boot</description>
     <properties>
         <java.version>11</java.version>
+        <blaze-persistence.version>1.6.10-SNAPSHOT</blaze-persistence.version>
     </properties>
     <dependencies>
         <dependency>
@@ -30,11 +31,11 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!--		<dependency>-->
-        <!--			<groupId>org.flywaydb</groupId>-->
-        <!--			<artifactId>flyway-maven-plugin</artifactId>-->
-        <!--			<version>9.21.2</version>-->
-        <!--		</dependency>-->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-maven-plugin</artifactId>
+            <version>9.21.2</version>
+        </dependency>
 
         <dependency>
             <groupId>com.github.eloyzone</groupId>
@@ -111,6 +112,36 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.blazebit/blaze-persistence-core-api-jakarta -->
+        <dependency>
+            <groupId>com.blazebit</groupId>
+            <artifactId>blaze-persistence-core-api-jakarta</artifactId>
+            <version>1.6.11</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.blazebit/blaze-persistence-core-impl-jakarta -->
+        <dependency>
+            <groupId>com.blazebit</groupId>
+            <artifactId>blaze-persistence-core-impl-jakarta</artifactId>
+            <version>1.6.11</version>
+            <scope>runtime</scope>
+        </dependency>
+
+
+        <!-- https://mvnrepository.com/artifact/com.blazebit/blaze-persistence-entity-view-api-jakarta -->
+        <dependency>
+            <groupId>com.blazebit</groupId>
+            <artifactId>blaze-persistence-entity-view-api-jakarta</artifactId>
+            <version>1.6.11</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.blazebit/blaze-persistence-entity-view-impl-jakarta -->
+        <dependency>
+            <groupId>com.blazebit</groupId>
+            <artifactId>blaze-persistence-entity-view-impl-jakarta</artifactId>
+            <version>1.6.11</version>
+            <scope>test</scope>
+        </dependency>
+
+
     </dependencies>
 
     <build>

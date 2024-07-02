@@ -15,7 +15,7 @@ public class ContractDropDownMapperImpl implements ContractDropDownMapper {
         } else {
             ContractDropDownDto contractDropDownDto = new ContractDropDownDto();
             contractDropDownDto.setId(contract.getId());
-            contractDropDownDto.setContractNumber(contract.getContractNumber());
+            contractDropDownDto.setContractDescription(contract.getContractNumber());
             return contractDropDownDto;
         }
     }

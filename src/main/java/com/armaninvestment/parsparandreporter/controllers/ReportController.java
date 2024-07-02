@@ -5,15 +5,20 @@ import com.armaninvestment.parsparandreporter.dtos.ReportDto;
 import com.armaninvestment.parsparandreporter.dtos.ReportWithSubtotalDTO;
 import com.armaninvestment.parsparandreporter.dtos.SalesByYearGroupByMonth;
 import com.armaninvestment.parsparandreporter.entities.Report;
-import com.armaninvestment.parsparandreporter.exceptions.DatabaseIntegrityViolationException;
-import com.armaninvestment.parsparandreporter.exceptions.RowImportException;
-import com.armaninvestment.parsparandreporter.exceptions.WarehouseReceiptAlreadyAssociatedException;
+import com.armaninvestment.parsparandreporter.entities.ReportDtoByQuery;
+import com.armaninvestment.parsparandreporter.entities.Year;
+import com.armaninvestment.parsparandreporter.exceptions.*;
 import com.armaninvestment.parsparandreporter.mappers.ReportMapper;
+import com.armaninvestment.parsparandreporter.repositories.CustomerRepository;
 import com.armaninvestment.parsparandreporter.repositories.ReportRepository;
+import com.armaninvestment.parsparandreporter.repositories.WarehouseReceiptRepository;
+import com.armaninvestment.parsparandreporter.repositories.YearRepository;
 import com.armaninvestment.parsparandreporter.services.ReportService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceException;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -36,13 +41,21 @@ public class ReportController {
     private final ReportRepository repository;
     private final ReportService reportService;
     private final ReportMapper mapper;
+    private final YearRepository yearRepository;
+    private final CustomerRepository customerRepository;
+    private final WarehouseReceiptRepository warehouseReceiptRepository;
 
     @Autowired
-    public ReportController(ReportRepository repository, ReportService reportService, ReportMapper mapper) {
+    public ReportController(ReportRepository repository, ReportService reportService, ReportMapper mapper, YearRepository yearRepository, CustomerRepository customerRepository, WarehouseReceiptRepository warehouseReceiptRepository) {
         this.repository = repository;
         this.reportService = reportService;
         this.mapper = mapper;
+        this.yearRepository = yearRepository;
+        this.customerRepository = customerRepository;
+        this.warehouseReceiptRepository = warehouseReceiptRepository;
     }
+
+    private static final Logger logger = LoggerFactory.getLogger(ReportController.class);
 
     @GetMapping("/")
     public ResponseEntity<Map<String, Object>> getReportsWithSubtotals(
@@ -67,21 +80,20 @@ public class ReportController {
     }
 
     @GetMapping(path = "/{id}")
-    public ResponseEntity<ReportDto> findById(@PathVariable("id") Long id) {
-        Optional<Report> optionalReport = repository.findById(id);
-        if (optionalReport.isPresent()) {
-            Report report = optionalReport.get();
-            return ResponseEntity.ok(mapper.toDto(report));
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<ReportDtoByQuery> findById(@PathVariable("id") Long id) {
+        return ResponseEntity.status(HttpStatus.OK).body(reportService.getReportById(id));
     }
 
     @PostMapping(path = {"/", ""})
     @Transactional
     public ResponseEntity<?> createReport(@RequestBody ReportDto reportDto) {
+        Optional<Year> optionalYear = yearRepository.findByYearName(reportDto.getYearName());
+        if (optionalYear.isEmpty()) {
+            throw new EntityNotFoundException("سال با شناسه " + reportDto.getYearName() + " یافت نشد.");
+        }
         try {
             Report report = mapper.toEntity(reportDto);
+            report.setYear(optionalYear.get());
             Report savedReport = repository.save(report);
             ReportDto savedReportDto = mapper.toDto(savedReport);
             return ResponseEntity.status(HttpStatus.CREATED).body(savedReportDto);
@@ -96,25 +108,25 @@ public class ReportController {
     }
 
     @PutMapping(path = "/{id}")
-    @Transactional
-    public ResponseEntity<?> updateReport(@PathVariable("id") Long id, @RequestBody ReportDto reportDto) {
+    public ResponseEntity<?> updateInvoice(@PathVariable Long id, @RequestBody ReportDto reportDto) {
         try {
-            Optional<Report> optionalReport = repository.findById(id);
-            if (optionalReport.isPresent()) {
-                Report report = optionalReport.get();
-                Report reportFromReportDto = mapper.partialUpdate(reportDto, report);
-                Report update = repository.save(reportFromReportDto);
-                return ResponseEntity.ok(mapper.toDto(update));
-            } else {
-                return ResponseEntity.notFound().build();
-            }
+            reportService.updateReport(id, reportDto);
+            return ResponseEntity.status(HttpStatus.OK).body("فاکتور با موفقیت بروز رسانی شد.");
         } catch (PersistenceException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("خطا در ایجاد: " + e.getMessage());
+                    .body("خطا در به‌روزرسانی: " + e.getMessage());
+        } catch (InvoiceExistByNumberAndYearNameException | InvoiceExistByNumberAndIssuedDateException |
+                 InvoiceItemExistByWareHouseReceiptException | IllegalArgumentException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("خطا در به‌روزرسانی: " + e.getMessage());
         } catch (WarehouseReceiptAlreadyAssociatedException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }
 
@@ -122,9 +134,9 @@ public class ReportController {
     public ResponseEntity<?> deleteReport(@PathVariable("id") Long id) {
         try {
             reportService.deleteReport(id);
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).body("قرارداد با موفقیت حذف شد.");
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).body("گزارش با موفقیت حذف شد.");
         } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("قرارداد با شناسه " + id + "یافت نشد.");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("گزارش با شناسه " + id + "یافت نشد.");
         } catch (DatabaseIntegrityViolationException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (RuntimeException e) {
@@ -135,17 +147,24 @@ public class ReportController {
     @PostMapping("/import")
     public ResponseEntity<String> importReports(@RequestParam("file") MultipartFile file) {
         try {
+            logger.info("شروع بارگذاری ...");
+            long startTime = System.currentTimeMillis();
             reportService.importReportsFromExcel(file);
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("فایل با موفقیت باگذاری شد.");
+            logger.info("پردازش آپلود فایل به مدت {} میلی‌ثانیه کامل شد", duration);
+            logger.info("فایل با موفقیت باگذاری شد.");
             return ResponseEntity.status(HttpStatus.CREATED).body("فایل با موفقیت باگذاری شد.");
         } catch (RowImportException e) {
-            e.printStackTrace();
+            logger.error("خطا در بارگذاری فایل:", e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("خطا در بارگذاری فایل:", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("خطا در بارگذاری فایل: " + e.getMessage());
         } catch (EntityNotFoundException e) {
-            e.printStackTrace();
+            logger.error("خطا در بارگذاری فایل:", e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("خطا در بارگذاری فایل: " + e.getMessage());
         }

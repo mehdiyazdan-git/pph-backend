@@ -57,6 +57,9 @@ public class Customer {
     @OneToMany(mappedBy = "customer", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private Set<Invoice> invoices = new LinkedHashSet<>();
 
+    @OneToMany(mappedBy = "customer", orphanRemoval = true)
+    private Set<Returned> returned = new LinkedHashSet<>();
+
     public boolean getBigCustomer() {
         return bigCustomer;
     }

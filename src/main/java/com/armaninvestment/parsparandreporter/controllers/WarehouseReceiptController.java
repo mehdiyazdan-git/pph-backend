@@ -4,7 +4,9 @@ package com.armaninvestment.parsparandreporter.controllers;
 import com.armaninvestment.parsparandreporter.dtos.NotInvoiced;
 import com.armaninvestment.parsparandreporter.dtos.WarehouseReceiptDto;
 import com.armaninvestment.parsparandreporter.dtos.list.WarehouseReceiptListDto;
+import com.armaninvestment.parsparandreporter.entities.WarehouseReceiptDtoByQuery;
 import com.armaninvestment.parsparandreporter.exceptions.DatabaseIntegrityViolationException;
+import com.armaninvestment.parsparandreporter.exceptions.RowImportException;
 import com.armaninvestment.parsparandreporter.exceptions.WareHouseReceiptRepetitiveByNumberAndDateException;
 import com.armaninvestment.parsparandreporter.exceptions.WareHouseReceiptRepetitiveByNumberAndYearException;
 import com.armaninvestment.parsparandreporter.services.WarehouseReceiptService;
@@ -12,6 +14,8 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceException;
 import jakarta.transaction.Transactional;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
@@ -24,7 +28,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
 @CrossOrigin
 @RestController
@@ -37,6 +40,7 @@ public class WarehouseReceiptController {
         this.warehouseReceiptService = warehouseReceiptService;
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(InvoiceController.class);
     @GetMapping(path = {"/not-invoiced/", "/not-invoiced"})
     public ResponseEntity<List<NotInvoiced>> findNotInvoicedByYearAndCustomer(@RequestParam(value = "customerCode", required = false) String customerCode,
                                                                               @RequestParam(value = "yearName", required = false) Long yearName,
@@ -46,31 +50,22 @@ public class WarehouseReceiptController {
         return ResponseEntity.ok(notInvoicelist);
     }
 
-    @GetMapping(path = {"/", ""})
-    public ResponseEntity<List<WarehouseReceiptDto>> getAllWarehouseReceipts() {
-        List<WarehouseReceiptDto> warehouseReceipts = warehouseReceiptService.getAllWarehouseReceipts();
-        return new ResponseEntity<>(warehouseReceipts, HttpStatus.OK);
-    }
-
     @GetMapping(path = "/list/{yearId}")
     public ResponseEntity<List<WarehouseReceiptListDto>> getWarehouseReceiptList(@PathVariable("yearId") Long yearId) {
-        List<WarehouseReceiptListDto> warehouseReceiptList = warehouseReceiptService.getWarehouseReceiptList(yearId);
-        return new ResponseEntity<>(warehouseReceiptList, HttpStatus.OK);
+        return new ResponseEntity<>(warehouseReceiptService.getWarehouseReceiptList(yearId), HttpStatus.OK);
     }
 
     @GetMapping(path = "/{id}")
-    public ResponseEntity<WarehouseReceiptDto> getWarehouseReceiptById(@PathVariable Long id) {
-        Optional<WarehouseReceiptDto> warehouseReceipt = warehouseReceiptService.getWarehouseReceiptById(id);
-        return warehouseReceipt.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
-                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    public ResponseEntity<WarehouseReceiptDtoByQuery> getWarehouseReceiptById(@PathVariable Long id) {
+        return ResponseEntity.status(HttpStatus.OK).body(warehouseReceiptService.getWarehouseReceiptById(id));
     }
 
     @PostMapping(path = {"/", ""})
     @Transactional
     public ResponseEntity<?> createWarehouseReceipt(@RequestBody WarehouseReceiptDto warehouseReceiptDto) {
         try {
-            WarehouseReceiptDto createdWarehouseReceipt = warehouseReceiptService.createWarehouseReceipt(warehouseReceiptDto);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdWarehouseReceipt);
+            WarehouseReceiptDto warehouseReceipt = warehouseReceiptService.createWarehouseReceipt(warehouseReceiptDto);
+            return ResponseEntity.status(HttpStatus.CREATED).body(warehouseReceipt);
         } catch (WareHouseReceiptRepetitiveByNumberAndDateException |
                  WareHouseReceiptRepetitiveByNumberAndYearException e) {
             e.printStackTrace();
@@ -84,10 +79,17 @@ public class WarehouseReceiptController {
     }
 
     @PutMapping(path = "/{id}")
-    public ResponseEntity<WarehouseReceiptDto> updateWarehouseReceipt(@PathVariable Long id, @RequestBody WarehouseReceiptDto warehouseReceiptDto) {
-        Optional<WarehouseReceiptDto> updatedWarehouseReceipt = warehouseReceiptService.updateWarehouseReceipt(id, warehouseReceiptDto);
-        return updatedWarehouseReceipt.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
-                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    public ResponseEntity<?> updateWarehouseReceipt(@PathVariable Long id, @RequestBody WarehouseReceiptDto warehouseReceiptDto) {
+        try {
+            warehouseReceiptService.updateWarehouseReceipt(id, warehouseReceiptDto);
+            return ResponseEntity.status(HttpStatus.OK).body("حواله با موفقیت بروز رسانی شد.");
+        } catch (EntityNotFoundException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("حواله با شناسه " + id + "یافت نشد.");
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("خطای سمت سرور...");
+        }
     }
 
     @DeleteMapping(path = "/{id}")
@@ -100,6 +102,7 @@ public class WarehouseReceiptController {
         } catch (DatabaseIntegrityViolationException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (RuntimeException e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("خطای سمت سرور...");
         }
     }
@@ -107,12 +110,22 @@ public class WarehouseReceiptController {
     @PostMapping(path = "/import")
     public ResponseEntity<String> importWarehouseReceipts(@RequestParam("file") MultipartFile file) {
         try {
+            logger.info("شروع بارگذاری ...");
+            long startTime = System.currentTimeMillis();
             warehouseReceiptService.importWarehouseReceiptsFromExcel(file);
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("فایل با موفقیت باگذاری شد.");
+            logger.info("پردازش آپلود فایل به مدت {} میلی‌ثانیه کامل شد", duration);
             return ResponseEntity.status(HttpStatus.CREATED).body("فایل با موفقیت باگذاری شد.");
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("خطا در بارگذاری فایل:", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("خطا در باگذاری فایل: " + e.getMessage());
+        } catch (RowImportException | WareHouseReceiptRepetitiveByNumberAndDateException e) {
+            logger.error("خطا در بارگذاری فایل:", e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(e.getMessage());
         }
     }
 

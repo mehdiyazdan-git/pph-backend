@@ -24,11 +24,11 @@ public class ContractItem {
     @Column(name = "quantity")
     private Long quantity;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToOne
     @JoinColumn(name = "product_id")
     private Product product;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToOne
     @JoinColumn(name = "contract_id")
     private Contract contract;
 

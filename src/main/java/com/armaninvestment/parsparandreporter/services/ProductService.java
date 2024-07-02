@@ -4,7 +4,6 @@ import com.armaninvestment.parsparandreporter.dtos.ProductDto;
 import com.armaninvestment.parsparandreporter.entities.Product;
 import com.armaninvestment.parsparandreporter.exceptions.DatabaseIntegrityViolationException;
 import com.armaninvestment.parsparandreporter.mappers.ProductMapper;
-import com.armaninvestment.parsparandreporter.repositories.ContractRepository;
 import com.armaninvestment.parsparandreporter.repositories.ProductRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
@@ -28,14 +27,13 @@ import java.util.stream.Collectors;
 public class ProductService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
-    private final ContractRepository contractRepository;
+
 
     @Autowired
-    public ProductService(ProductRepository productRepository, ProductMapper productMapper,
-                          ContractRepository contractRepository) {
+    public ProductService(ProductRepository productRepository, ProductMapper productMapper) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
-        this.contractRepository = contractRepository;
+
     }
 
     // Create a new product
@@ -83,16 +81,17 @@ public class ProductService {
         Optional<Product> optionalProduct = productRepository.findById(productId);
         if (optionalProduct.isEmpty()) {
             throw new EntityNotFoundException("مشتری ای با شناسه " + productId + "یافت نشد.");
-        }
-        Product product = optionalProduct.get();
+        } else {
 
-        if (!product.getContractItems().isEmpty()) {
-            throw new DatabaseIntegrityViolationException("امکان حذف محصول وجود ندارد چون آیتم های قرارداد مرتبط دارد.");
+            if (productRepository.hasAssociatedContractItems(productId)) {
+                throw new DatabaseIntegrityViolationException("امکان حذف محصول وجود ندارد چون آیتم های قرارداد مرتبط دارد.");
+            }
+            if (productRepository.hasAssociatedWarehouseReceiptItems(productId)) {
+                throw new DatabaseIntegrityViolationException("امکان حذف محصول وجود ندارد چون آیتم های حواله مرتبط دارد.");
+            }
+            productRepository.deleteById(productId);
+
         }
-        if (!product.getWarehouseReceiptItems().isEmpty()) {
-            throw new DatabaseIntegrityViolationException("امکان حذف محصول وجود ندارد چون آیتم های حواله مرتبط دارد.");
-        }
-        contractRepository.deleteById(productId);
     }
 
     @Transactional

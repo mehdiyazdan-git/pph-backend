@@ -13,9 +13,6 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.Objects;
-import java.util.Optional;
-
 @Component
 public class InvoiceItemMapperImpl implements InvoiceItemMapper {
     private final ProductRepository productRepository;
@@ -52,25 +49,31 @@ public class InvoiceItemMapperImpl implements InvoiceItemMapper {
     }
 
     private boolean isWareHouseReceiptDuplicate(Long warehouseReceiptId, Long currentInvoiceItemId) {
-        Optional<WarehouseReceipt> optionalWarehouseReceipt = warehouseReceiptRepository.findById(warehouseReceiptId);
-        return optionalWarehouseReceipt.isPresent()
-                && optionalWarehouseReceipt.get().getInvoiceItem() != null
-                && !Objects.equals(optionalWarehouseReceipt.get().getInvoiceItem().getId(), currentInvoiceItemId);
+        return warehouseReceiptRepository.isDuplicateWarehouseReceipt(warehouseReceiptId, currentInvoiceItemId);
     }
+
+
+//    private boolean isWareHouseReceiptDuplicate(Long warehouseReceiptId, Long currentInvoiceItemId) {
+//        Optional<WarehouseReceipt> optionalWarehouseReceipt = warehouseReceiptRepository.findById(warehouseReceiptId);
+//        return optionalWarehouseReceipt.isPresent()
+//                && optionalWarehouseReceipt.get().getInvoiceItem() != null
+//                && !Objects.equals(optionalWarehouseReceipt.get().getInvoiceItem().getId(), currentInvoiceItemId);
+//    }
 
     public InvoiceItem toEntity(InvoiceItemDto invoiceItemDto) {
         if (invoiceItemDto == null) {
             return null;
         } else {
-
-            // Create a new InvoiceItem
             InvoiceItem invoiceItem = new InvoiceItem();
-            invoiceItem.setInvoice(this.getInvoice(invoiceItemDto.getInvoiceId()));
-            WarehouseReceipt warehouseReceipt = this.retrieveWarehouseReceipt(invoiceItemDto);
-            if (isWareHouseReceiptDuplicate(invoiceItemDto.getWarehouseReceiptId(), invoiceItemDto.getId())) {
-                throw new WarehouseReceiptAlreadyAssociatedException("حواله " + warehouseReceipt.getWarehouseReceiptNumber() + " با فاکتور دیگری در ارتباط می باشد.");
+            invoiceItem.setId(invoiceItemDto.getId());
+            Long receiptId = invoiceItemDto.getWarehouseReceiptId();
+            if (!warehouseReceiptRepository.isWarehouseReceiptExistById(receiptId)) {
+                throw new EntityNotFoundException("حواله ای با شناسه " + receiptId + " یافت نشد.");
             }
-            invoiceItem.setWarehouseReceipt(warehouseReceipt);
+            if (isWareHouseReceiptDuplicate(receiptId, invoiceItemDto.getId())) {
+                throw new WarehouseReceiptAlreadyAssociatedException("حواله " + receiptId + " با فاکتور دیگری در ارتباط می باشد.");
+            }
+            invoiceItem.setWarehouseReceipt(new WarehouseReceipt(receiptId));
             invoiceItem.setProduct(this.toProductEntity(invoiceItemDto.getProductId()));
             invoiceItem.setQuantity(invoiceItemDto.getQuantity());
             invoiceItem.setUnitPrice(invoiceItemDto.getUnitPrice());
@@ -128,30 +131,23 @@ public class InvoiceItemMapperImpl implements InvoiceItemMapper {
         }
     }
 
-    protected Invoice getInvoice(Long invoiceId) {
-        if (invoiceId == null) {
-            return null;
-        } else {
-            Invoice invoice = new Invoice();
-            invoice.setId(invoiceId);
-            return invoice;
-        }
-    }
-
     protected Product toProductEntity(Long productId) {
         if (productId == null) {
             throw new IllegalArgumentException("شناسه محصول نمی تواند خالی باشد.");
         }
-        Optional<Product> optionalProduct = productRepository.findById(productId);
-        return optionalProduct.orElseThrow(() -> new EntityNotFoundException("محصولی ای با شناسه" + productId + "یافت نشد."));
+        boolean productExistsById = productRepository.checkProductExistsById(productId);
+        if (!productExistsById) throw new EntityNotFoundException("محصولی ای با شناسه" + productId + "یافت نشد.");
+        return new Product(productId);
     }
 
     protected WarehouseReceipt retrieveWarehouseReceipt(InvoiceItemDto invoiceItemDto) {
         if (invoiceItemDto == null) {
             return null;
         } else {
-            Optional<WarehouseReceipt> optionalWarehouseReceipt = warehouseReceiptRepository.findById(invoiceItemDto.getWarehouseReceiptId());
-            return optionalWarehouseReceipt.orElseThrow(() -> new EntityNotFoundException("حواله ای با شناسه" + invoiceItemDto.getWarehouseReceiptId() + "یافت نشد."));
+            boolean receiptExistById = warehouseReceiptRepository.isWarehouseReceiptExistById(invoiceItemDto.getWarehouseReceiptId());
+            if (!receiptExistById)
+                throw new EntityNotFoundException("حواله ای با شناسه" + invoiceItemDto.getWarehouseReceiptId() + "یافت نشد.");
+            return new WarehouseReceipt(invoiceItemDto.getWarehouseReceiptId());
         }
     }
 

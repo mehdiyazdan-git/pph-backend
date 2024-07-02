@@ -3,13 +3,14 @@ package com.armaninvestment.parsparandreporter.controllers;
 import com.armaninvestment.parsparandreporter.dtos.ContractAndInvoiceTotalsDTO;
 import com.armaninvestment.parsparandreporter.dtos.InvoiceDto;
 import com.armaninvestment.parsparandreporter.dtos.InvoiceListDto;
-import com.armaninvestment.parsparandreporter.exceptions.InvoiceExistByNumberAndIssuedDateException;
-import com.armaninvestment.parsparandreporter.exceptions.InvoiceExistByNumberAndYearNameException;
-import com.armaninvestment.parsparandreporter.exceptions.InvoiceItemExistByWareHouseReceiptException;
-import com.armaninvestment.parsparandreporter.exceptions.WarehouseReceiptAlreadyAssociatedException;
+import com.armaninvestment.parsparandreporter.dtos.InvoiceListRowDto;
+import com.armaninvestment.parsparandreporter.entities.InvoiceDtoByQuery;
+import com.armaninvestment.parsparandreporter.exceptions.*;
 import com.armaninvestment.parsparandreporter.services.InvoiceService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -20,7 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.List;
-import java.util.Optional;
+
 
 @CrossOrigin
 @RestController
@@ -34,6 +35,7 @@ public class InvoiceController {
         this.invoiceService = invoiceService;
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(InvoiceController.class);
     @GetMapping(path = "/max-invoice-number")
     public Long getMaxInvoiceNumber() {
         return invoiceService.getMaxInvoiceNumber();
@@ -63,9 +65,8 @@ public class InvoiceController {
 
 
     @GetMapping(path = "/{id}")
-    public ResponseEntity<InvoiceDto> getInvoiceById(@PathVariable("id") Long id) {
-        Optional<InvoiceDto> invoiceOptional = invoiceService.getInvoiceById(id);
-        return invoiceOptional.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<InvoiceDtoByQuery> getInvoiceById(@PathVariable("id") Long id) {
+        return ResponseEntity.status(HttpStatus.OK).body(invoiceService.getInvoiceById(id));
     }
 
     @GetMapping(path = "/contract-details/{contractId}/{invoiceId}")
@@ -80,10 +81,11 @@ public class InvoiceController {
     }
 
     @GetMapping(path = "/list/{yearName}")
-    public ResponseEntity<List<InvoiceListDto>> getWarehouseReceiptList(@PathVariable("yearName") Long yearId) {
-        List<InvoiceListDto> invoicesByYearName = invoiceService.findAllInvoicesByYearName(yearId);
-        return new ResponseEntity<>(invoicesByYearName, HttpStatus.OK);
+    public ResponseEntity<List<InvoiceListRowDto>> getWarehouseReceiptList(@PathVariable("yearName") Long yearName) {
+        List<InvoiceListRowDto> invoiceListByCustomerCodeAndYearName = invoiceService.getInvoiceListByCustomerCodeAndYearName(null, yearName);
+        return ResponseEntity.ok(invoiceListByCustomerCodeAndYearName);
     }
+
 
     @GetMapping(path = "/{contractId}/findInvoiceByContract")
     public ResponseEntity<List<InvoiceListDto>> findInvoiceByContract(@PathVariable("contractId") Long contractId) {
@@ -93,8 +95,8 @@ public class InvoiceController {
     @PutMapping(path = "/{id}")
     public ResponseEntity<?> updateInvoice(@PathVariable Long id, @RequestBody InvoiceDto updatedInvoiceDto) {
         try {
-            InvoiceDto updatedInvoice = invoiceService.updateInvoice(id, updatedInvoiceDto);
-            return updatedInvoice != null ? ResponseEntity.ok(updatedInvoice) : ResponseEntity.notFound().build();
+            invoiceService.updateInvoice(id, updatedInvoiceDto);
+            return ResponseEntity.status(HttpStatus.OK).body("فاکتور با موفقیت بروز رسانی شد.");
         } catch (PersistenceException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -131,12 +133,23 @@ public class InvoiceController {
     @PostMapping(path = "/upload")
     public ResponseEntity<String> importInvoices(@RequestParam("file") MultipartFile file) {
         try {
+            logger.info("شروع بارگذاری ...");
+            long startTime = System.currentTimeMillis();
             invoiceService.importInvoicesFromExcel(file);
-            return ResponseEntity.ok("فایل با موفقیت بارگذاری شد."); // Return a success message
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("فایل با موفقیت باگذاری شد.");
+            logger.info("پردازش آپلود فایل به مدت {} میلی‌ثانیه کامل شد", duration);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body("فایل با موفقیت بارگذاری شد."); // Return a success message
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("خطا در بارگذاری فایل:", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("خطا در بارگذاری فایل: " + e.getMessage()); // Return an error message
+        } catch (RowImportException e) {
+            logger.error("خطا در بارگذاری فایل:", e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(e.getMessage());
         }
     }
 }

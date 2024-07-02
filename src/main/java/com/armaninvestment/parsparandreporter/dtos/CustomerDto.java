@@ -5,8 +5,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * DTO for {@link com.armaninvestment.parsparandreporter.entities.Customer}
@@ -30,6 +28,4 @@ public class CustomerDto implements Serializable {
     public void setBigCustomer(boolean bigCustomer) {
         this.bigCustomer = bigCustomer;
     }
-
-    private List<PaymentDto> payments = new ArrayList<>();
 }

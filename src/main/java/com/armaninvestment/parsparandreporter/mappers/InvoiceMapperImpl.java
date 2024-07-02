@@ -5,7 +5,6 @@ import com.armaninvestment.parsparandreporter.dtos.InvoiceItemDto;
 import com.armaninvestment.parsparandreporter.entities.*;
 import com.armaninvestment.parsparandreporter.enums.SalesType;
 import com.armaninvestment.parsparandreporter.exceptions.InvoiceExistByNumberAndIssuedDateException;
-import com.armaninvestment.parsparandreporter.exceptions.WareHouseReceiptRepetitiveByNumberAndYearException;
 import com.armaninvestment.parsparandreporter.repositories.*;
 import com.github.eloyzone.jalalicalendar.DateConverter;
 import com.github.eloyzone.jalalicalendar.JalaliDate;
@@ -60,6 +59,9 @@ public class InvoiceMapperImpl implements InvoiceMapper {
         return result.toString();
     }
 
+    public boolean doesInvoiceExist(Long invoiceNumber, LocalDate issuedDate) {
+        return invoiceRepository.checkInvoiceExists(invoiceNumber, java.sql.Date.valueOf(issuedDate));
+    }
 
     public Invoice toEntity(InvoiceDto invoiceDto) {
         Long number = invoiceDto.getInvoiceNumber();
@@ -70,13 +72,9 @@ public class InvoiceMapperImpl implements InvoiceMapper {
         JalaliDate jalaliDate = dateConverter.gregorianToJalali(date.getYear(), date.getMonth(), date.getDayOfMonth());
         String result = jalaliDate.format(new JalaliDateFormatter("yyyy/mm/dd", JalaliDateFormatter.FORMAT_IN_PERSIAN));
 
-        if (invoiceRepository.existsByInvoiceNumberAndIssuedDate(number, date)) {
-            throw new InvoiceExistByNumberAndIssuedDateException("فاکتور با تاریخ " + result + "و شماره " + convertToPersianDigits(number) + " قبلا ثبت شده است.");
-        }
-        if (invoiceRepository.existsByInvoiceNumberAndIssuedDate(number, invoiceDto.getIssuedDate())) {
-            throw new WareHouseReceiptRepetitiveByNumberAndYearException(
-                    "فاکتور با شماره " + convertToPersianDigits(number)
-                            + "در سال " + convertToPersianDigits(yearName) + " قبلا ثبت شده است.");
+        if (doesInvoiceExist(number, date)) {
+            throw new InvoiceExistByNumberAndIssuedDateException(
+                    "فاکتور با تاریخ " + result + "و شماره " + convertToPersianDigits(number) + " قبلا ثبت شده است.");
         }
 
         if (invoiceDto == null) {
@@ -90,6 +88,9 @@ public class InvoiceMapperImpl implements InvoiceMapper {
             invoice.setIssuedDate(invoiceDto.getIssuedDate());
             invoice.setDueDate(invoiceDto.getDueDate());
             invoice.setYear(this.getYear(invoiceDto.getYearName()));
+            invoice.setAdvancedPayment(invoiceDto.getAdvancedPayment());
+            invoice.setPerformanceBound(invoiceDto.getPerformanceBound());
+            invoice.setInsuranceDeposit(invoiceDto.getInsuranceDeposit());
             invoice.setInvoiceItems(this.convertDtoSetToEntitySet(invoiceDto.getInvoiceItems()));
 
             // Set the contract only if the sales type is CONTRACTUAL_SALES
@@ -126,6 +127,9 @@ public class InvoiceMapperImpl implements InvoiceMapper {
             invoiceDto.setIssuedDate(invoice.getIssuedDate());
             invoiceDto.setDueDate(invoice.getDueDate());
             invoiceDto.setYearName(this.getInvoiceYearName(invoice));
+            invoiceDto.setAdvancedPayment(invoice.getAdvancedPayment());
+            invoiceDto.setPerformanceBound(invoice.getPerformanceBound());
+            invoiceDto.setInsuranceDeposit(invoice.getInsuranceDeposit());
             invoiceDto.setInvoiceItems(this.convertEntitySetToDtoSet(invoice.getInvoiceItems()));
             return invoiceDto;
         }
@@ -136,17 +140,20 @@ public class InvoiceMapperImpl implements InvoiceMapper {
             return null;
         } else {
 
+            if (invoiceDto.getId() != null) {
+                invoice.setId(invoiceDto.getId());
+            }
             if (invoiceDto.getInvoiceStatusId() != null) {
                 invoice.setInvoiceStatus(this.getInvoiceStatus(invoiceDto.getInvoiceStatusId()));
             }
 
             // Set the contract only if the sales type is CONTRACTUAL_SALES
             if (SalesType.CONTRACTUAL_SALES.equals(invoiceDto.getSalesType())) {
-                Optional<Contract> optionalContract = contractRepository.findById(invoiceDto.getContractId());
-                if (optionalContract.isEmpty()) {
+                boolean existsContractById = contractRepository.existsContractById(invoiceDto.getContractId());
+                if (!existsContractById) {
                     throw new IllegalArgumentException("شناسه قرارداد نمی تواند خالی باشد.");
                 }
-                invoice.setContract(optionalContract.get());
+                invoice.setContract(new Contract(invoiceDto.getContractId()));
             } else {
                 // If the sales type is CASH_SALES, make sure the contract-related fields are not set
                 if (invoiceDto.getContractId() != null) {
@@ -162,6 +169,15 @@ public class InvoiceMapperImpl implements InvoiceMapper {
 
             if (invoiceDto.getInvoiceNumber() != null) {
                 invoice.setInvoiceNumber(invoiceDto.getInvoiceNumber());
+            }
+            if (invoiceDto.getAdvancedPayment() != null) {
+                invoice.setAdvancedPayment(invoiceDto.getAdvancedPayment());
+            }
+            if (invoiceDto.getPerformanceBound() != null) {
+                invoice.setPerformanceBound(invoiceDto.getPerformanceBound());
+            }
+            if (invoiceDto.getInsuranceDeposit() != null) {
+                invoice.setInsuranceDeposit(invoiceDto.getInsuranceDeposit());
             }
 
             if (invoiceDto.getIssuedDate() != null) {
@@ -195,18 +211,15 @@ public class InvoiceMapperImpl implements InvoiceMapper {
     }
 
     protected InvoiceStatus getInvoiceStatus(Integer invoiceStatusId) {
-        Optional<InvoiceStatus> statusOptional = invoiceStatusRepository.findById(invoiceStatusId);
-        return statusOptional.orElseThrow(() -> new EntityNotFoundException("وضعیت با شناسه " + invoiceStatusId + " یافت نشد."));
+        boolean statusExistsById = invoiceStatusRepository.checkStatusExistsById(invoiceStatusId);
+        if (!statusExistsById) throw new EntityNotFoundException("وضعیت با شناسه " + invoiceStatusId + " یافت نشد.");
+        return new InvoiceStatus(invoiceStatusId);
     }
 
     protected Customer getCustomer(Long customerId) {
-        Optional<Customer> optionalCustomer = customerRepository.findById(customerId);
-        return optionalCustomer.orElseThrow(() -> new EntityNotFoundException("مشتری با شناسه " + customerId + " یافت نشد."));
-    }
-
-    protected Contract getInvoiceContract(Long contractId) {
-        Optional<Contract> contractOptional = contractRepository.findById(contractId);
-        return contractOptional.orElseThrow(() -> new EntityNotFoundException("قرارداد با شناسه " + contractId + " یافت نشد."));
+//        boolean customerExistsById = customerRepository.checkCustomerExistsById(customerId);
+//        if (!customerExistsById) throw new EntityNotFoundException("مشتری با شناسه " + customerId + " یافت نشد.");
+        return new Customer(customerId);
     }
 
     protected Year getYear(Long yearName) {

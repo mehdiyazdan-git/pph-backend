@@ -14,5 +14,5 @@ import java.io.Serializable;
 @NoArgsConstructor
 public class ContractDropDownDto implements Serializable {
     private Long id;
-    private String contractNumber;
+    private String contractDescription;
 }

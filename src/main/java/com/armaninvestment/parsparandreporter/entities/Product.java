@@ -33,6 +33,10 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private List<WarehouseReceiptItem> warehouseReceiptItems = new ArrayList<>();
 
+    public Product(Long id) {
+        this.id = id;
+    }
+
     @Override
     public final boolean equals(Object o) {
         if (this == o) return true;

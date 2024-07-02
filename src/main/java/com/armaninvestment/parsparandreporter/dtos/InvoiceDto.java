@@ -27,4 +27,26 @@ public class InvoiceDto implements Serializable {
     private Integer invoiceStatusId;
     private Long customerId;
     private Long yearName;
+    private Long advancedPayment;
+    private Long performanceBound;
+    private Long insuranceDeposit;
+
+    @Override
+    public String toString() {
+        return "InvoiceDto{" +
+                "id=" + id +
+                ", invoiceNumber=" + invoiceNumber +
+                ", issuedDate=" + issuedDate +
+                ", dueDate=" + dueDate +
+                ", invoiceItems=" + invoiceItems +
+                ", contractId=" + contractId +
+                ", salesType=" + salesType +
+                ", invoiceStatusId=" + invoiceStatusId +
+                ", customerId=" + customerId +
+                ", yearName=" + yearName +
+                ", advancedPayment=" + advancedPayment +
+                ", performanceBound=" + performanceBound +
+                ", insuranceDeposit=" + insuranceDeposit +
+                '}';
+    }
 }

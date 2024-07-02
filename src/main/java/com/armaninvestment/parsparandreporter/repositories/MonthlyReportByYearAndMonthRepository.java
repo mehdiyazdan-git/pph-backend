@@ -11,6 +11,7 @@ import java.util.List;
 @Repository
 public interface MonthlyReportByYearAndMonthRepository extends JpaRepository<CompanyReportDTO, Long> {
     @Query(value = "SELECT * FROM get_monthly_report_by_year_and_month(:year, :month, cast(:productType as text))", nativeQuery = true)
-    List<CompanyReportDTO> getReport(@Param("year") int year, @Param("month") int month, @Param("productType") String productType);
+    List<Object[]> getReport(@Param("year") int year, @Param("month") int month, @Param("productType") String productType);
+
 }
 

@@ -26,6 +26,10 @@ public class InvoiceStatus {
     @OneToMany(mappedBy = "invoiceStatus", orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<Invoice> invoices = new LinkedHashSet<>();
 
+    public InvoiceStatus(Integer id) {
+        this.id = id;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

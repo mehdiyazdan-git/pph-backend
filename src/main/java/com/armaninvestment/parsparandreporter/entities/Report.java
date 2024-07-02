@@ -27,21 +27,22 @@ public class Report {
     @Column(name = "report_date")
     private LocalDate date;
 
-    @OneToMany(mappedBy = "report", cascade = {CascadeType.PERSIST}, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "report", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.EAGER, orphanRemoval = true)
     private List<ReportItem> reportItems = new ArrayList<>();
 
     @ManyToOne
     @JoinColumn(name = "year_id")
     private Year year;
 
-    public void addItem(ReportItem reportItem) {
-        reportItems.add(reportItem);
-        reportItem.setReport(this);
-    }
-
-    public void removeItem(ReportItem reportItem) {
-        reportItems.remove(reportItem);
-        reportItem.setReport(null);
+    @Override
+    public String toString() {
+        return "Report{" +
+                "id=" + id +
+                ", explanation='" + explanation + '\'' +
+                ", date=" + date +
+                ", reportItems=" + reportItems +
+                ", year=" + year +
+                '}';
     }
 
     @Override

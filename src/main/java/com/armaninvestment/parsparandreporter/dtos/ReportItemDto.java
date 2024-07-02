@@ -18,4 +18,5 @@ public class ReportItemDto implements Serializable {
     private Integer quantity;
     private Long customerId;
     private Long warehouseReceiptId;
+    private Long reportId;
 }

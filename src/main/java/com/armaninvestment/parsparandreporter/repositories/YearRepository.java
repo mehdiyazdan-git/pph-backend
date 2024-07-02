@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -30,6 +31,9 @@ public interface YearRepository extends JpaRepository<Year, Long> {
 
     @Query("SELECT COUNT(wr.id) FROM WarehouseReceipt wr  WHERE wr.year.id = :year_Id")
     long countWareHouseReceipts(@Param("year_Id") Long year_Id);
+
+    @Query("select y from Year y order by y.name DESC")
+    List<Year> findAllYearsOrderByNameDesc();
 
 
 }

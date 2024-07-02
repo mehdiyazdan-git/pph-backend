@@ -1,14 +1,8 @@
 package com.armaninvestment.parsparandreporter.services;
 
 
-import com.armaninvestment.parsparandreporter.dtos.ContractDto;
-import com.armaninvestment.parsparandreporter.dtos.ContractItemDto;
-import com.armaninvestment.parsparandreporter.dtos.ContractListDto;
-import com.armaninvestment.parsparandreporter.dtos.ContractSummaryDto;
-import com.armaninvestment.parsparandreporter.entities.Contract;
-import com.armaninvestment.parsparandreporter.entities.Customer;
-import com.armaninvestment.parsparandreporter.entities.Product;
-import com.armaninvestment.parsparandreporter.entities.Year;
+import com.armaninvestment.parsparandreporter.dtos.*;
+import com.armaninvestment.parsparandreporter.entities.*;
 import com.armaninvestment.parsparandreporter.exceptions.DatabaseIntegrityViolationException;
 import com.armaninvestment.parsparandreporter.exceptions.RowImportException;
 import com.armaninvestment.parsparandreporter.mappers.ContractListMapper;
@@ -30,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -59,6 +54,12 @@ public class ContractService {
         this.contractSummaryMapper = contractSummaryMapper;
         this.yearRepository = yearRepository;
     }
+
+    public String findContractDescriptionByContractNumber(String contractNumber) {
+        String contractDescriptionByContractNumber = contractRepository.findContractDescriptionByContractNumber(contractNumber);
+        return (contractDescriptionByContractNumber != null) ? contractDescriptionByContractNumber : "نقدی";
+    }
+
 
     public List<ContractListDto> getAllContracts(Long customerId) {
         List<Contract> contracts;
@@ -93,20 +94,77 @@ public class ContractService {
     }
 
     @Transactional
-    public ContractDto createContract(ContractDto contractDto) {
+    public ContractDto create(ContractDto contractDto) {
+        Optional<Year> optionalYear = yearRepository.findByYearName(contractDto.getYearId());
+        if (optionalYear.isEmpty()) {
+            throw new EntityNotFoundException("سال با شناسه " + contractDto.getYearId() + " یافت نشد.");
+        }
         Contract contract = contractMapper.toEntity(contractDto);
+        contract.setYear(optionalYear.get());
         Contract savedContract = contractRepository.save(contract);
         return contractMapper.toDto(savedContract);
     }
 
-    public ContractDto getContractById(Long id) {
-        Optional<Contract> optionalContract = contractRepository.findById(id);
-        if (optionalContract.isPresent()) {
-            Contract contract = optionalContract.get();
-            return contractMapper.toDto(contract);
-        } else {
+    public ContractDto getContractById(Long contractId) {
+        Optional<Contract> optionalContract = contractRepository.findById(contractId);
+        if (optionalContract.isEmpty()) {
+            throw new EntityNotFoundException("قرارداد با شناسه " + contractId + " یافت نشد.");
+        }
+
+        return contractMapper.toDto(optionalContract.get());
+    }
+
+    private ContractDtoByQuery mapToContractDto(List<Object[]> contract, List<Object[]> contractItem) {
+        if (contract.isEmpty()) {
             return null;
         }
+        Object[] row = contract.get(0);
+        ContractDtoByQuery contractDto = new ContractDtoByQuery();
+
+        contractDto.setContractId((Long) row[0]);
+        contractDto.setContractNumber((String) row[1]);
+        contractDto.setContractDescription((String) row[2]);
+        contractDto.setStartDate(((Date) row[3]).toLocalDate());
+        contractDto.setEndDate(((Date) row[4]).toLocalDate());
+        contractDto.setAdvancePaymentCoefficient((Double) row[5]);
+        contractDto.setContractPerformanceBondCoefficient((Double) row[6]);
+        contractDto.setContractInsuranceDepositCoefficient((Double) row[7]);
+        contractDto.setCustomerId((Long) row[8]);
+        contractDto.setYearId((Long) row[9]);
+        contractDto.setCumulativeContractAmount((Long) row[10]);
+        contractDto.setCumulativeContractQuantity((Long) row[11]);
+        contractDto.setContractAdvancedPaymentAmount((Long) row[12]);
+        contractDto.setContractPerformanceBoundAmount((Long) row[13]);
+        contractDto.setContractInsuranceDepositAmount((Long) row[14]);
+        contractDto.setTotalCommittedContractAmount((Long) row[15]);
+        contractDto.setTotalCommittedContractCount((Long) row[16]);
+        contractDto.setTotalRemainingContractAmount((Long) row[17]);
+        contractDto.setTotalRemainingContractCount((Long) row[18]);
+        contractDto.setTotalConsumedContractAdvancedPayment((Long) row[19]);
+        contractDto.setTotalOutstandingContractAdvancedPayment((Long) row[20]);
+        contractDto.setTotalCommittedPerformanceBound((Long) row[21]);
+        contractDto.setTotalRemainingPerformanceBond((Long) row[22]);
+        contractDto.setTotalCommittedInsuranceDeposit((Long) row[23]);
+        contractDto.setTotalRemainingInsuranceDeposit((Long) row[24]);
+
+        List<ContractDtoByQuery.ContractItemDto> contractItems = mapToContractItemDtoSet(contractItem);
+        contractDto.setContractItems(new LinkedHashSet<>(contractItems));
+        return contractDto;
+    }
+
+    private List<ContractDtoByQuery.ContractItemDto> mapToContractItemDtoSet(List<Object[]> result) {
+        return result.stream()
+                .map(this::mapToContractItemDto)
+                .collect(Collectors.toList());
+    }
+
+    private ContractDtoByQuery.ContractItemDto mapToContractItemDto(Object[] row) {
+        Long itemId = (Long) row[0];
+        Long unitPrice = (Long) row[1];
+        Long quantity = (Long) row[2];
+        Long productId = (Long) row[3];
+
+        return new ContractDtoByQuery.ContractItemDto(itemId, unitPrice, quantity, productId);
     }
 
     public ContractListDto getContractListById(Long id) {
@@ -139,24 +197,15 @@ public class ContractService {
         if (optionalYear.isEmpty()) {
             throw new EntityNotFoundException("سال با شناسه " + yearName + " یافت نشد.");
         }
-        return contractRepository.findAllByYearOrderByIdAsc(new Year(optionalYear.get().getId()))
-                .stream()
-                .map(contractListMapper::toDto)
-                .collect(Collectors.toList());
+        return contractRepository.mapToContractListDto(yearName);
     }
 
     public void deleteContract(Long id) {
-        Optional<Contract> optionalContract = contractRepository.findById(id);
-        if (optionalContract.isEmpty()) {
+        if (!contractRepository.existsContractById(id)) {
             throw new EntityNotFoundException("قراردادی با شناسه " + id + "یافت نشد.");
         }
-        Contract contract = optionalContract.get();
-
-        if (!contract.getInvoices().isEmpty()) {
-            throw new DatabaseIntegrityViolationException("امكان حذف قرارداد وجود ندارد چون فاكتور مرتبط دارد.");
-        }
-        if (!contract.getAddendums().isEmpty()) {
-            throw new DatabaseIntegrityViolationException("امکان حذف قرارداد وجود ندارد چون الحاقیه های مرتبط دارد.");
+        if (contractRepository.existsContractByIdAndInvoicesIsNotEmpty(id)) {
+            throw new DatabaseIntegrityViolationException("امکان حذف قرارداد وجود ندارد چون فاکتور های مرتبط دارد.");
         }
         contractRepository.deleteById(id);
     }
@@ -188,7 +237,7 @@ public class ContractService {
                     continue; // Skip header row
                 }
                 try {
-                    int rowNum = row.getRowNum() + 1; // Adjust row number to be 1-based
+                    // Adjust row number to be 1-based
                     String contractNumber = row.getCell(0).getStringCellValue();
 
                     // Check if the contract with this number already exists
@@ -200,15 +249,15 @@ public class ContractService {
                         contract.setContractDescription(row.getCell(1).getStringCellValue());
                         contract.setStartDate(convertDate(row.getCell(2).getStringCellValue()));
                         contract.setEndDate(convertDate(row.getCell(3).getStringCellValue()));
-                        contract.setAdvancePayment((long) row.getCell(4).getNumericCellValue());
-                        contract.setPerformanceBond((long) row.getCell(5).getNumericCellValue());
-                        contract.setInsuranceDeposit((long) row.getCell(6).getNumericCellValue());
+                        contract.setAdvancePayment(row.getCell(4).getNumericCellValue());
+                        contract.setPerformanceBond(row.getCell(5).getNumericCellValue());
+                        contract.setInsuranceDeposit(row.getCell(6).getNumericCellValue());
                         long customerCode = (long) row.getCell(7).getNumericCellValue();
                         contract.setCustomerId(customerRepository
                                 .findByCustomerCode(String.valueOf(customerCode))
                                 .orElseThrow(() -> new EntityNotFoundException("مشتری با این کد " + customerCode + "یافت نشد."))
                                 .getId());
-                        contract.setYearName((long) row.getCell(8).getNumericCellValue());
+                        contract.setYearId((long) row.getCell(8).getNumericCellValue());
                         contract.setContractItems(new HashSet<>());
                         contractMap.put(contractNumber, contract);
                     }
@@ -280,5 +329,22 @@ public class ContractService {
         }
 
         return workbook;
+    }
+
+    public List<InvoicesByContractIdDto> getAllInvoicesByContractId(Long contractId) {
+        List<Object[]> list = contractRepository.getAllInvoicesByContractId(contractId);
+        return list.stream().map(obj -> {
+            InvoicesByContractIdDto dto = new InvoicesByContractIdDto();
+            dto.setInvoiceId((Long) obj[0]);
+            dto.setInvoiceNumber((Long) obj[1]);
+            dto.setInvoiceDate((String) obj[2]);
+            dto.setInvoiceQuantity((Long) obj[3]);
+            dto.setInvoiceAmount((Long) obj[4]);
+            dto.setInvoiceAddedValueTax((Long) obj[5]);
+            dto.setAdvancedPayment((Long) obj[6]);
+            dto.setPerformanceBound((Long) obj[7]);
+            dto.setInsuranceDeposit((Long) obj[8]);
+            return dto;
+        }).toList();
     }
 }

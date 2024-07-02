@@ -25,15 +25,15 @@ public class WarehouseReceiptItem {
     @Column(name = "unit_price")
     private Long unitPrice;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH})
+    @ManyToOne
     @JoinColumn(name = "warehouse_receipt_id")
     private WarehouseReceipt warehouseReceipt;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH})
+    @ManyToOne
     @JoinColumn(name = "product_id", foreignKey = @ForeignKey(name = "fk_warehouse_receipt_item__product"))
     private Product product;
 
-    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH})
+    @ManyToOne
     @JoinColumn(name = "year_id")
     private Year year;
 

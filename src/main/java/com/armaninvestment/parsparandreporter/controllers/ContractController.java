@@ -4,9 +4,12 @@ package com.armaninvestment.parsparandreporter.controllers;
 import com.armaninvestment.parsparandreporter.dtos.ContractDto;
 import com.armaninvestment.parsparandreporter.dtos.ContractListDto;
 import com.armaninvestment.parsparandreporter.dtos.ContractSummaryDto;
+import com.armaninvestment.parsparandreporter.dtos.InvoicesByContractIdDto;
+import com.armaninvestment.parsparandreporter.entities.Year;
 import com.armaninvestment.parsparandreporter.exceptions.DatabaseIntegrityViolationException;
 import com.armaninvestment.parsparandreporter.exceptions.DuplicateContractNumberException;
 import com.armaninvestment.parsparandreporter.exceptions.RowImportException;
+import com.armaninvestment.parsparandreporter.repositories.YearRepository;
 import com.armaninvestment.parsparandreporter.services.ContractService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceException;
@@ -24,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 @CrossOrigin
 @Controller
@@ -31,11 +35,28 @@ import java.util.List;
 public class ContractController {
 
     private final ContractService contractService;
+    private final YearRepository yearRepository;
 
     @Autowired
-    public ContractController(ContractService contractService) {
+    public ContractController(ContractService contractService,
+                              YearRepository yearRepository) {
         this.contractService = contractService;
+        this.yearRepository = yearRepository;
     }
+
+    @GetMapping(path = "/{contractNumber}/find-desc-by-number")
+    public ResponseEntity<String> findContractDescriptionByContractNumber(@PathVariable("contractNumber") String contractNumber) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_PLAIN);  // Set content type
+        headers.set("X-Description-Source", "Contract-Service");
+
+        String contractDescription = contractService.findContractDescriptionByContractNumber(contractNumber);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .headers(headers)
+                .body(contractDescription);
+    }
+
 
     @GetMapping("/search")
     public ResponseEntity<List<ContractListDto>> searchContractsForDropdown(
@@ -66,7 +87,7 @@ public class ContractController {
     @PostMapping(path = {"/", ""})
     public ResponseEntity<?> create(@RequestBody ContractDto contractDto) {
         try {
-            ContractDto savedContractDto = contractService.createContract(contractDto);
+            ContractDto savedContractDto = contractService.create(contractDto);
             return ResponseEntity.status(HttpStatus.CREATED).body(savedContractDto);
         } catch (PersistenceException e) {
             e.printStackTrace();
@@ -79,10 +100,15 @@ public class ContractController {
         }
     }
 
-    @GetMapping(path = "/list/{yearName}")
-    public ResponseEntity<List<ContractListDto>> getWarehouseReceiptList(@PathVariable("yearName") Long yearName) {
-        List<ContractListDto> allByYearName = contractService.findAllByYearName(yearName);
-        return new ResponseEntity<>(allByYearName, HttpStatus.OK);
+    @GetMapping(path = "/list/{yearName}/by-year")
+    public ResponseEntity<List<ContractListDto>> findAllByYearName(@PathVariable("yearName") Long yearName) {
+        Optional<Year> optionalYear = yearRepository.findByYearName(yearName);
+        if (optionalYear.isPresent()) {
+            List<ContractListDto> allByYearName = contractService.findAllByYearName(optionalYear.get().getName());
+            return new ResponseEntity<>(allByYearName, HttpStatus.OK);
+        }
+
+        return null;
     }
 
 
@@ -96,13 +122,23 @@ public class ContractController {
         }
     }
 
-    @PutMapping(path = "/{id}")
-    public ResponseEntity<ContractDto> update(@PathVariable("id") Long id, @RequestBody ContractDto contractDto) {
-        ContractDto savedContractDto = contractService.updateContract(id, contractDto);
-        if (savedContractDto != null) {
-            return new ResponseEntity<>(savedContractDto, HttpStatus.CREATED);
+    @GetMapping(path = "/{contractId}/invoices_by_contract_id")
+    public ResponseEntity<List<InvoicesByContractIdDto>> getAllInvoicesByContractId(@PathVariable("contractId") Long contractId) {
+        List<InvoicesByContractIdDto> list = contractService.getAllInvoicesByContractId(contractId);
+        if (list != null) {
+            return new ResponseEntity<>(list, HttpStatus.OK);
         } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @PutMapping(path = "/{id}")
+    public ResponseEntity<String> update(@PathVariable("id") Long id, @RequestBody ContractDto contractDto) {
+        try {
+            contractService.updateContract(id, contractDto);
+            return ResponseEntity.status(HttpStatus.OK).body("قرارداد با موفقیت بروز رسانی شد.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }
 
@@ -116,6 +152,7 @@ public class ContractController {
         } catch (DatabaseIntegrityViolationException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (RuntimeException e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("خطای سمت سرور...");
         }
     }

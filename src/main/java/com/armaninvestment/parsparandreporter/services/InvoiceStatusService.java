@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class InvoiceStatusService {
@@ -41,7 +40,7 @@ public class InvoiceStatusService {
 
 
     public List<InvoiceStatusDto> getAllInvoiceStatuses() {
-        return invoiceStatusRepository.findAll().stream().map(invoiceStatusMapper::toDto).collect(Collectors.toList());
+        return invoiceStatusRepository.mapToDtoList();
     }
 
     public Optional<InvoiceStatusDto> getInvoiceStatusById(Integer id) {

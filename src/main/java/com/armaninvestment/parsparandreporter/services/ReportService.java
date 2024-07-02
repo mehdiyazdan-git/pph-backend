@@ -31,6 +31,9 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import static com.armaninvestment.parsparandreporter.services.InvoiceService.convertToPersianDate;
 
 @Service
 public class ReportService {
@@ -65,6 +68,35 @@ public class ReportService {
             list.add(dto);
         }
         return list;
+    }
+
+    @Transactional
+    public void updateReport(Long reportId, ReportDto reportDto) {
+        if (!reportRepository.existsById(reportId))
+            throw new EntityNotFoundException("گزارش با شناسه " + reportId + " یافت نشد.");
+
+        reportRepository.updateReport(
+                reportDto.getExplanation(),
+                reportDto.getDate(),
+                reportId
+        );
+
+        reportRepository.deleteReportItems(reportId);
+
+        for (ReportItemDto reportItemDto : reportDto.getReportItems()) {
+            Long receiptId = reportItemDto.getWarehouseReceiptId();
+            if (!warehouseReceiptRepository.isWarehouseReceiptExistById(receiptId)) {
+                throw new EntityNotFoundException("حواله ای با شناسه " + receiptId + " یافت نشد.");
+            }
+            reportRepository.createReportItem(
+                    reportItemDto.getCustomerId(),
+                    reportItemDto.getQuantity(),
+                    reportItemDto.getUnitPrice(),
+                    reportId,
+                    reportItemDto.getWarehouseReceiptId()
+
+            );
+        }
     }
 
     public Page<ReportWithSubtotalDTO> getReportsWithSubtotals(
@@ -122,24 +154,21 @@ public class ReportService {
         return null;
     }
 
-    @Transactional
     public void importReportsFromExcel(MultipartFile file) throws IOException {
+        Map<String, ReportDto> reportMap = new HashMap<>();
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = new XSSFWorkbook(inputStream)) {
             Sheet sheet = workbook.getSheetAt(0);
-
-            Map<String, ReportDto> reportMap = new HashMap<>();
 
             for (Row row : sheet) {
                 if (row.getRowNum() == 0) {
                     continue;
                 }
+                String reportId = row.getCell(0).getStringCellValue();
+                ReportDto reportDto = reportMap.get(reportId);
                 try {
                     int rowNum = row.getRowNum() + 1; // Adjust row number to be 1-based
-                    String reportId = row.getCell(0).getStringCellValue();
 
-
-                    ReportDto reportDto = reportMap.get(reportId);
                     if (reportDto == null) {
                         reportDto = new ReportDto();
                         reportDto.setExplanation(row.getCell(1).getStringCellValue());
@@ -148,38 +177,32 @@ public class ReportService {
                         reportDto.setReportItems(new ArrayList<>());
                         reportMap.put(reportId, reportDto);
                     }
-
-
                     ReportItemDto reportItem = new ReportItemDto();
                     reportItem.setUnitPrice((long) row.getCell(4).getNumericCellValue());
                     reportItem.setQuantity((int) row.getCell(5).getNumericCellValue());
                     long customerCode = (long) row.getCell(6).getNumericCellValue();
                     Customer customer = customerRepository.findByCustomerCode(String.valueOf(customerCode)).orElseThrow(() -> new EntityNotFoundException("مشتری با کد " + customerCode + " یافت نشد."));
                     reportItem.setCustomerId(customer.getId());
-                    long receiptId = (long) row.getCell(7).getNumericCellValue();
-
-                    LocalDate date = convertDate(row.getCell(8).getStringCellValue());
-                    Long id = findWarehouseReceiptByNumberAndDate(receiptId, date).getId();
-                    reportItem.setWarehouseReceiptId(id);
+                    long receiptNumber = (long) row.getCell(7).getNumericCellValue();
+                    LocalDate receiptDate = convertDate(row.getCell(8).getStringCellValue());
+                    Long receiptIdByWarehouseReceiptNumberAndDate = warehouseReceiptRepository.getWarehouseReceiptIdByWarehouseReceiptNumberAndDate(receiptNumber, receiptDate);
+                    if (receiptIdByWarehouseReceiptNumberAndDate == null) {
+                        throw new WarehouseReceiptNotFoundException("حواله با شناسه " + receiptNumber + " و تاریخ " + convertToPersianDate(receiptDate) + " یافت نشد.");
+                    } else {
+                        reportItem.setWarehouseReceiptId(receiptIdByWarehouseReceiptNumberAndDate);
+                    }
                     reportDto.getReportItems().add(reportItem);
+                    reportMap.put(reportId, reportDto);
                 } catch (Exception e) {
-                    // Catch exceptions that may occur while processing the row
-                    int rowNum = row.getRowNum() + 1; // Adjust row number to be 1-based
+                    int rowNum = row.getRowNum() + 1;
                     throw new RowImportException(rowNum, e.getMessage());
                 }
             }
-            for (ReportDto reportDto : reportMap.values()) {
-                reportRepository.save(reportMapper.toEntity(reportDto));
-            }
         }
-    }
-
-    public WarehouseReceipt findWarehouseReceiptByNumberAndDate(Long number, LocalDate date) {
-        WarehouseReceipt warehouseReceipt = warehouseReceiptRepository.findByNumberAndDate(number, date);
-        if (warehouseReceipt == null) {
-            throw new WarehouseReceiptNotFoundException("حواله با شناسه " + number + " و تاریخ " + " یافت نشد.");
+        for (ReportDto reportDto : reportMap.values()) {
+            reportDto.setYearName(3L);
+            reportRepository.save(reportMapper.toEntity(reportDto));
         }
-        return warehouseReceipt;
     }
 
     public XSSFWorkbook generateReportsToExcel(List<ReportDto> reports) {
@@ -221,9 +244,8 @@ public class ReportService {
     }
 
     public void deleteReport(Long id) {
-        Optional<Report> optionalReport = reportRepository.findById(id);
-        if (optionalReport.isEmpty()) {
-            throw new EntityNotFoundException("قراردادی با شناسه " + id + "یافت نشد.");
+        if (!reportRepository.existsById(id)) {
+            throw new EntityNotFoundException("گزارش با شناسه " + id + "یافت نشد.");
         }
         reportRepository.deleteById(id);
     }
@@ -290,6 +312,50 @@ public class ReportService {
         }
     }
 
+    public ReportDtoByQuery getReportById(Long reportId) {
+        List<Object[]> reportResult = reportRepository.getReportById(reportId);
+        List<Object[]> reportItemsResult = reportRepository.getReportItemsByReportId(reportId);
+
+        ReportDtoByQuery reportDto = mapToReportDto(reportResult);
+        List<ReportDtoByQuery.ReportItemDto> reportItems = mapToReportItemDtoList(reportItemsResult);
+
+        if (reportDto != null) {
+            reportDto.setReportItems(reportItems);
+        }
+
+        return reportDto;
+    }
+
+    private ReportDtoByQuery mapToReportDto(List<Object[]> result) {
+        if (result.isEmpty()) {
+            return null;
+        }
+
+        Object[] row = result.get(0);
+
+        Long reportId = (Long) row[0];
+        String explanation = (String) row[1];
+        LocalDate date = ((java.sql.Date) row[2]).toLocalDate();
+        Long yearId = (Long) row[3];
+
+        return new ReportDtoByQuery(reportId, explanation, date, null, yearId);
+    }
+
+    private List<ReportDtoByQuery.ReportItemDto> mapToReportItemDtoList(List<Object[]> result) {
+        return result.stream()
+                .map(this::mapToReportItemDto)
+                .collect(Collectors.toList());
+    }
+
+    private ReportDtoByQuery.ReportItemDto mapToReportItemDto(Object[] row) {
+        Long itemId = (Long) row[0];
+        Integer quantity = (Integer) row[1];
+        Long unitPrice = (Long) row[2];
+        Long customerId = (Long) row[3];
+        Long warehouseReceiptId = (Long) row[4];
+
+        return new ReportDtoByQuery.ReportItemDto(itemId, unitPrice, quantity, customerId, warehouseReceiptId);
+    }
 
 }
 
